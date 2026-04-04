@@ -3,6 +3,7 @@ import pandas as pd
 from math import radians, cos, sin, asin, sqrt
 from parser import TelemetryParser
 import argparse
+from scipy.integrate import cumulative_trapezoid
 
 def haversine_vectorized(df):
     """
