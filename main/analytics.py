@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from math import radians, cos, sin, asin, sqrt
-from parser import TelemetryParser
+from bin_parser import TelemetryParser
 import argparse
 from scipy.integrate import cumulative_trapezoid
 

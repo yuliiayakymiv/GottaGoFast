@@ -1,15 +1,18 @@
 """
-інтерактивний дашборд, AI-асистент
+Interactive dashboard for drone flight analysis with AI assistant.
+
+This module provides a web interface for uploading Ardupilot .bin flight logs,
+displaying computed metrics, and generating text-based AI reports about anomalies.
 """
 
-import streamlit as st
 import os
 import tempfile
 from groq import Groq
-import pandas as pd
 
-from parser import TelemetryParser
+from bin_parser import TelemetryParser
 from analytics import get_metrics
+
+import streamlit as st
 
 st.set_page_config(
     page_title="Аналізатор польотів",
@@ -25,7 +28,7 @@ with st.sidebar:
     st.header("Налаштування")
     try:
         groq_api_key  = st.secrets["GROQ_API_KEY"]
-    except:
+    except (KeyError, AttributeError, TypeError):
         groq_api_key  = None
 
     st.markdown("---")
@@ -33,7 +36,20 @@ with st.sidebar:
 
 
 def generate_ai_report(metrics: dict, api_key: str) -> str:
-    """Генерує текстовий звіт про аномалії польоту на основі метрик"""
+    """
+    Generate a text report about flight anomalies using Groq API.
+
+    This function builds a prompt from computed metrics, sends a request
+    to the LLaMA 3 model via Groq API, and returns a text analysis.
+
+    Args:
+        metrics (dict): Dictionary with flight metrics (distance, speed, altitude...)
+        api_key (str): Groq API key for authentication
+
+    Returns:
+        str: AI-generated text report or error message
+    """
+
     if not api_key:
         return "API ключ не введено"
 
@@ -68,10 +84,10 @@ def generate_ai_report(metrics: dict, api_key: str) -> str:
 
         return response.choices[0].message.content
 
-    except Exception as e:
+    except (ValueError, IOError, KeyError) as e:
         return f"Помилка при генерації AI звіту: {str(e)}"
 
-# Завантаження файлу
+# File upload widget
 uploaded_file = st.file_uploader(
     "Виберіть BIN файл польоту",
     type=['bin']
@@ -80,19 +96,19 @@ uploaded_file = st.file_uploader(
 if uploaded_file is not None:
     st.success(f"Файл {uploaded_file.name} завантажено")
 
-    # Зберігаємо завантажений файл тимчасово на диск
+    # Save uploaded file to temporary storage
     with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as tmp_file:
         tmp_file.write(uploaded_file.getvalue())
         tmp_path = tmp_file.name
 
-    # Парсимо лог і отримуємо метрики
+    # Parse log and compute metrics
     with st.spinner("Аналізую лог..."):
         try:
             parser = TelemetryParser(tmp_path)
             df_gps, df_imu = parser.parse()
             metrics = get_metrics(df_gps, df_imu)
 
-            # Виводимо метрики у вигляді 4 колонок
+            # Main metrics (4 columns)
             st.subheader("Метрики польоту")
             col1, col2, col3, col4 = st.columns(4)
             with col1:
@@ -100,29 +116,41 @@ if uploaded_file is not None:
             with col2:
                 st.metric("Дистанція", f"{metrics.get('total_distance_m', 0):.0f} м")
             with col3:
-                st.metric("Макс. швидкість (гориз.)", f"{metrics.get('max_speed_h_kmh', 0):.1f} км/год")
+                st.metric(
+                    "Макс. швидкість (гориз.)",
+                    f"{metrics.get('max_speed_h_kmh', 0):.1f} км/год"
+                )
             with col4:
                 st.metric("Макс. набір висоти", f"{metrics.get('max_altitude_gain_m', 0):.0f} м")
 
-            # Додаткові метрики в розгорнутому вигляді
+            # Detailed metrics (expandable)
             with st.expander("Детальні метрики"):
                 col_a, col_b, col_c = st.columns(3)
                 with col_a:
-                    st.metric("Вертикальна швидкість (макс.)", f"{metrics.get('max_speed_v_ms', 0):.1f} м/с")
+                    st.metric(
+                        "Вертикальна швидкість (макс.)",
+                        f"{metrics.get('max_speed_v_ms', 0):.1f} м/с"
+                    )
                 with col_b:
-                    st.metric("Прискорення (макс.)", f"{metrics.get('max_acceleration_ms2', 0):.1f} м/с²")
+                    st.metric(
+                        "Прискорення (макс.)",
+                        f"{metrics.get('max_acceleration_ms2', 0):.1f} м/с²"
+                    )
                 with col_c:
-                    st.metric("Швидкість з IMU (макс.)", f"{metrics.get('max_speed_imu_ms', 0):.1f} м/с")
+                    st.metric(
+                        "Швидкість з IMU (макс.)",
+                        f"{metrics.get('max_speed_imu_ms', 0):.1f} м/с"
+                    )
 
-        except Exception as e:
+        except (ValueError, IOError, KeyError) as e:
             st.error(f"Помилка при аналізі: {str(e)}")
             metrics = {}
 
-    # Видаляємо тимчасовий файл
+    # Clean up temporary file
     try:
         os.unlink(tmp_path)
     except PermissionError:
-        pass  # Файл уже видалений або ще використовується
+        pass  # File already deleted or still in use
 
     st.markdown("---")
     st.subheader("AI-аналіз аномалій польоту")
