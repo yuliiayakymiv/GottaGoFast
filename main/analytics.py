@@ -91,6 +91,33 @@ def flight_duration(df_gps):
     end   = df_gps['timestamp'].iloc[-1]
     return round(end - start, 2)
 
+def get_max_acceleration(df_imu):
+    """
+    Обчислює максимальне прискорення (м/с²) за вирахуванням гравітації
+    """
+    if df_imu.empty:
+        return 0.0
+    acc_vectors = df_imu[['acc_x', 'acc_y', 'acc_z']].values
+    acc_magnitude = np.linalg.norm(acc_vectors, axis=1)
+    max_acc = np.max(np.abs(acc_magnitude - 9.81))
+
+    return round(max_acc, 2)
+
+def get_max_speed_imu(df_imu):
+    """
+    Обчислює максимальну швидкість (м/с) через інтегрування прискорень
+    """
+    if df_imu.empty:
+        return 0.0
+    t = df_imu['timestamp'].values
+    v_x = cumulative_trapezoid(df_imu['acc_x'], t, initial=0)
+    v_y = cumulative_trapezoid(df_imu['acc_y'], t, initial=0)
+
+    v_z = cumulative_trapezoid(df_imu['acc_z'] - 9.81, t, initial=0)
+    v_total = np.sqrt(v_x**2 + v_y**2 + v_z**2)
+    return round(np.max(v_total), 2)
+
+
 def get_metrics(df_gps, df_imu):
     """
     Повертає словник з усіма метриками польоту.
@@ -102,8 +129,8 @@ def get_metrics(df_gps, df_imu):
         'max_speed_h_kmh':      max_horizontal_speed(df_gps),
         'max_speed_v_ms':       max_vertical_speed(df_gps),
         'max_altitude_gain_m':  max_altitude_gain(df_gps),
-        'max_acceleration_ms2': '',
-        'max_speed_imu_ms':     ''
+        'max_acceleration_ms2': get_max_acceleration(df_imu),
+        'max_speed_imu_ms':     get_max_speed_imu(df_imu)
     }
 
 
