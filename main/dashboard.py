@@ -11,6 +11,7 @@ from groq import Groq
 
 from bin_parser import TelemetryParser
 from analytics import get_metrics
+from visualization import build_3d_figure
 
 import streamlit as st
 
@@ -62,7 +63,7 @@ def generate_ai_report(metrics: dict, api_key: str) -> str:
         Ось отримані дані польоту:
         - Загальна дистанція: {metrics.get('total_distance_m', 0):.0f} метрів
         - Тривалість польоту: {metrics.get('duration_s', 0):.1f} секунд ({metrics.get('duration_s', 0)/60:.1f} хв)
-        - Максимальна горизонтальна швидкість: {metrics.get('max_speed_h_kmh', 0):.1f} км/год
+        - Максимальна горизонтальна швидкість: {metrics.get('max_speed_h_kmh', 0):.1f} м/с
         - Максимальна вертикальна швидкість: {metrics.get('max_speed_v_ms', 0):.1f} м/с
         - Максимальний набір висоти: {metrics.get('max_altitude_gain_m', 0):.0f} метрів
         - Максимальне прискорення: {metrics.get('max_acceleration_ms2', 0):.1f} м/с²
@@ -118,7 +119,7 @@ if uploaded_file is not None:
             with col3:
                 st.metric(
                     "Макс. швидкість (гориз.)",
-                    f"{metrics.get('max_speed_h_kmh', 0):.1f} км/год"
+                    f"{metrics.get('max_speed_h_kmh', 0):.1f} м/с"
                 )
             with col4:
                 st.metric("Макс. набір висоти", f"{metrics.get('max_altitude_gain_m', 0):.0f} м")
@@ -168,3 +169,8 @@ if uploaded_file is not None:
 
 else:
     st.info("Завантаж BIN файл, щоб почати")
+
+# 3D Візуалізація
+st.subheader("3D Траєкторія польоту")
+fig_3d = build_3d_figure(df_gps)
+st.plotly_chart(fig_3d, use_container_width=True)
