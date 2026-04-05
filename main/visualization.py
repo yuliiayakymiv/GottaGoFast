@@ -12,9 +12,9 @@ import plotly.graph_objects as go
 
 JUMP_THRESH = 50
 AGL_MAX_M   = 100
-MAX_REALISTIC_SPEED = 50
-MIN_TIME_DELTA = 0.01
-SMOOTH_WINDOW = 5
+MAX_REALISTIC_SPEED = 50  # 50 м/с = 180 км/год (максимум для дрона)
+MIN_TIME_DELTA = 0.01     # мінімальний час між точками (секунди)
+SMOOTH_WINDOW = 5         # вікно для згладжування траєкторії
 
 
 def _to_agl(df: pd.DataFrame) -> pd.DataFrame:
@@ -53,7 +53,7 @@ def _to_agl(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def smooth_trajectory(df: pd.DataFrame, window: int = SMOOTH_WINDOW) -> pd.DataFrame:
-    """Smoothes coordinates with a moving average."""
+    """Згладжує координати ковзним середнім."""
     df = df.copy()
     df["east"] = df["east"].rolling(window=window, center=True, min_periods=1).mean()
     df["north"] = df["north"].rolling(window=window, center=True, min_periods=1).mean()
@@ -62,7 +62,7 @@ def smooth_trajectory(df: pd.DataFrame, window: int = SMOOTH_WINDOW) -> pd.DataF
 
 
 def remove_outliers(df: pd.DataFrame, threshold: float = 50) -> pd.DataFrame:
-    """Removes points where coordinates jump more than threshold meters."""
+    """Видаляє точки, де координати стрибають більше ніж threshold метрів."""
     df = df.copy()
     de = df["east"].diff().abs()
     dn = df["north"].diff().abs()
@@ -91,10 +91,12 @@ def _compute_speed(df: pd.DataFrame, max_speed: float = MAX_REALISTIC_SPEED) -> 
     du = df["up"].diff().fillna(0)
     dt = df["timestamp"].diff().replace(0, np.nan)
 
+    # Мінімальний час між точками (щоб уникнути ділення на нуль та гігантських швидкостей)
     dt = dt.clip(lower=MIN_TIME_DELTA)
 
     speed = np.sqrt(de**2 + dn**2 + du**2) / dt
 
+    # Обмежуємо максимальну швидкість реалістичним значенням
     speed = speed.clip(upper=max_speed)
 
     return speed.fillna(0).values
@@ -108,6 +110,7 @@ def build_3d_figure(
     """Create interactive 3D trajectory plot. Color by 'speed' or 'time'."""
     df = wgs84_to_enu(_to_agl(df_gps))
 
+    # Фільтруємо викиди та згладжуємо траєкторію
     df = remove_outliers(df, threshold=50)
     df = smooth_trajectory(df, window=SMOOTH_WINDOW)
 
@@ -115,6 +118,7 @@ def build_3d_figure(
         c_values = _compute_speed(df)
         c_label = "Speed (m/s)"
         cscale = "Plasma"
+        # Обмежуємо шкалу для кращого відображення
         c_values_display = np.clip(c_values, 0, MAX_REALISTIC_SPEED)
     else:
         c_values_display = (df["timestamp"] - df["timestamp"].iloc[0]).values
@@ -202,7 +206,7 @@ def build_speed_chart(df_gps: pd.DataFrame) -> go.Figure:
     df = smooth_trajectory(df, window=SMOOTH_WINDOW)
 
     t = df["timestamp"] - df["timestamp"].iloc[0]
-    spd = _compute_speed(df) * 3.6
+    spd = _compute_speed(df) * 3.6  # переведення в км/год
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(
