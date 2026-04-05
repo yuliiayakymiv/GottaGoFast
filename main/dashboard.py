@@ -143,6 +143,11 @@ if uploaded_file is not None:
                         f"{metrics.get('max_speed_imu_ms', 0):.1f} м/с"
                     )
 
+            # 3D Візуалізація
+            st.subheader("3D Траєкторія польоту")
+            fig_3d = build_3d_figure(df_gps)
+            st.plotly_chart(fig_3d, use_container_width=True)
+
         except (ValueError, IOError, KeyError) as e:
             st.error(f"Помилка при аналізі: {str(e)}")
             metrics = {}
@@ -169,8 +174,3 @@ if uploaded_file is not None:
 
 else:
     st.info("Завантаж BIN файл, щоб почати")
-
-# 3D Візуалізація
-st.subheader("3D Траєкторія польоту")
-fig_3d = build_3d_figure(df_gps)
-st.plotly_chart(fig_3d, use_container_width=True)
